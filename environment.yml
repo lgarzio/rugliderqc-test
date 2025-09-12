@@ -12,3 +12,4 @@ dependencies:
   - xarray=2025.9.0
   - gsw=3.6.20
   - pyco2sys=1.8.3.4
+  - pyyaml==6.0.2
