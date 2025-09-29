@@ -66,7 +66,7 @@ def main(deployments, mode, loglevel, test):
         # Set the default qc configuration path
         qc_config_root = os.path.join(data_home, 'qc', 'config')
         if not os.path.isdir(qc_config_root):
-            logging_base.warning('Invalid QC config root: {:s}'.format(qc_config_root))
+            logging_base.warning(f'Invalid QC config root: {qc_config_root}')
             return 1
 
         #for deployment in args.deployments:
@@ -76,11 +76,11 @@ def main(deployments, mode, loglevel, test):
             data_path, deployment_location = cf.find_glider_deployment_datapath(logging_base, deployment, deployments_root, mode)
 
             if not data_path:
-                logging_base.error('{:s} data directory not found:'.format(deployment))
+                logging_base.error(f'{deployment} data directory not found:')
                 continue
 
             if not os.path.isdir(os.path.join(deployment_location, 'proc-logs')):
-                logging_base.error('{:s} deployment proc-logs directory not found:'.format(deployment))
+                logging_base.error(f'{deployment} deployment proc-logs directory not found:')
                 continue
 
             logfilename = logfile_deploymentname(deployment, mode)
@@ -92,16 +92,16 @@ def main(deployments, mode, loglevel, test):
             # Set the deployment qc configuration path
             deployment_qc_config_root = os.path.join(deployment_location, 'config', 'qc')
             if not os.path.isdir(deployment_qc_config_root):
-                logging.warning('Invalid deployment QC config root: {:s}'.format(deployment_qc_config_root))
+                logging.warning(f'Invalid deployment QC config root: {deployment_qc_config_root}')
 
             # Determine if the test should be run or not
             qctests_config_file = os.path.join(deployment_qc_config_root, 'qctests.yml')
             if os.path.isfile(qctests_config_file):
-                qctests_config_dict = cf.load_yaml_file(qctests_config_file)
+                qctests_config_dict = cf.load_yaml_file(qctests_config_file, logger=logging)
                 if not qctests_config_dict['remove_zeros']:
                     logging.warning(
-                        'Not removing zero fill values because test is turned off, check: {:s}'.format(
-                            qctests_config_file))
+                        f'Not removing zero fill values because test is turned off, check: {qctests_config_file}'
+                        )
                     continue
 
             logging.info('Checking for TWRC fill values of 0.00: {:s}'.format(os.path.join(data_path, 'qc_queue')))
@@ -109,20 +109,20 @@ def main(deployments, mode, loglevel, test):
             # Get all of the possible CTD variable names from the config file
             ctd_config_file = os.path.join(qc_config_root, 'ctd_variables.yml')
             if not os.path.isfile(ctd_config_file):
-                logging.error('Invalid CTD variable name config file: {:s}.'.format(ctd_config_file))
+                logging.error(f'Invalid CTD variable name config file: {ctd_config_file}.')
                 status = 1
                 continue
 
-            ctd_vars = cf.load_yaml_file(ctd_config_file, logging)
+            ctd_vars = cf.load_yaml_file(ctd_config_file, logger=logging)
 
             # Get dissolved oxygen variable names
             oxygen_config_file = os.path.join(qc_config_root, 'oxygen_variables.yml')
             if not os.path.isfile(oxygen_config_file):
-                logging.error('Invalid DO variable name config file: {:s}.'.format(oxygen_config_file))
+                logging.error(f'Invalid DO variable name config file: {oxygen_config_file}.')
                 status = 1
                 continue
 
-            oxygen_vars = cf.load_yaml_file(oxygen_config_file, logging)
+            oxygen_vars = cf.load_yaml_file(oxygen_config_file, logger=logging)
 
             # List the netcdf files in qc_queue
             ncfiles = sorted(glob.glob(os.path.join(data_path, 'qc_queue', '*.nc')))
@@ -141,12 +141,12 @@ def main(deployments, mode, loglevel, test):
                     with xr.open_dataset(f, decode_times=False) as ds:
                         ds = ds.load()
                 except OSError as e:
-                    logging.error('Error reading file {:s} ({:})'.format(f, e))
+                    logging.error(f'Error reading file {f} ({e})')
                     os.rename(f, f'{f}.bad')
                     status = 1
                     continue
                 except ValueError as e:
-                    logging.error('Error reading file {:s} ({:})'.format(f, e))
+                    logging.error(f'Error reading file {f} ({e})')
                     os.rename(f, f'{f}.bad')
                     status = 1
                     continue
@@ -163,8 +163,8 @@ def main(deployments, mode, loglevel, test):
                     ds.to_netcdf(f)
                     zeros_removed += 1
 
-            logging.info('Removed 0.00 values (TWRC fill values) for CTD and/or DO variables in {:} files (of {:} '
-                         'total files)'.format(zeros_removed, len(ncfiles)))
+            logging.info(f'Removed 0.00 values (TWRC fill values) for CTD and/or DO variables in {zeros_removed} files (of {len(ncfiles)} '
+                         'total files)')
         return status
 
 
