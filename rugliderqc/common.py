@@ -19,9 +19,7 @@ from ioos_qc.results import collect_results
 def convert_epoch_ts(data):
     if isinstance(data, xr.core.dataarray.DataArray):
         time = pd.to_datetime(num2date(data.values, data.units, only_use_cftime_datetimes=False))
-    elif isinstance(data, pd.core.indexes.base.Index):
-        time = pd.to_datetime(num2date(data, 'seconds since 1970-01-01T00:00:00Z', only_use_cftime_datetimes=False))
-    elif isinstance(data, pd.core.indexes.datetimes.DatetimeIndex):
+    else:
         time = pd.to_datetime(num2date(data, 'seconds since 1970-01-01T00:00:00Z', only_use_cftime_datetimes=False))
 
     return time
@@ -95,12 +93,13 @@ def find_glider_deployments_rootdir(logger, test):
     return data_home, deployments_root
 
 
-def load_yaml_file(yaml_file, logger):
+def load_yaml_file(yaml_file, logger=None):
     with open(yaml_file, 'r') as file:
         try:
             data_dict = yaml.safe_load(file)  # Parse the YAML file
         except yaml.YAMLError as e:
-            logger.error(f"Error reading YAML file {yaml_file}: {e}")
+            if logger:
+                logger.error(f"Error reading YAML file {yaml_file}: {e}")
             data_dict = {}
 
     return data_dict
