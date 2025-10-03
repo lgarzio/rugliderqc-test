@@ -49,8 +49,6 @@ def check_zeros(varname_dict, dataset, ds_modified, var1, var2):
 
 #def main(args):
 def main(deployments, mode, loglevel, test):
-    status = 0
-
     # loglevel = args.loglevel.upper()
     # mode = args.mode
     # test = args.test
@@ -110,7 +108,6 @@ def main(deployments, mode, loglevel, test):
             ctd_config_file = os.path.join(qc_config_root, 'ctd_variables.yml')
             if not os.path.isfile(ctd_config_file):
                 logging.error(f'Invalid CTD variable name config file: {ctd_config_file}.')
-                status = 1
                 continue
 
             ctd_vars = cf.load_yaml_file(ctd_config_file, logger=logging)
@@ -119,7 +116,6 @@ def main(deployments, mode, loglevel, test):
             oxygen_config_file = os.path.join(qc_config_root, 'oxygen_variables.yml')
             if not os.path.isfile(oxygen_config_file):
                 logging.error(f'Invalid DO variable name config file: {oxygen_config_file}.')
-                status = 1
                 continue
 
             oxygen_vars = cf.load_yaml_file(oxygen_config_file, logger=logging)
@@ -129,7 +125,6 @@ def main(deployments, mode, loglevel, test):
 
             if len(ncfiles) == 0:
                 logging.error(' 0 files found to check: {:s}'.format(os.path.join(data_path, 'qc_queue')))
-                status = 1
                 continue
 
             # Iterate through files and check for values of 0.0
@@ -143,12 +138,10 @@ def main(deployments, mode, loglevel, test):
                 except OSError as e:
                     logging.error(f'Error reading file {f} ({e})')
                     os.rename(f, f'{f}.bad')
-                    status = 1
                     continue
                 except ValueError as e:
                     logging.error(f'Error reading file {f} ({e})')
                     os.rename(f, f'{f}.bad')
-                    status = 1
                     continue
 
                 # Set CTD values to fill values where conductivity and temperature both = 0.00
@@ -165,7 +158,6 @@ def main(deployments, mode, loglevel, test):
 
             logging.info(f'Removed 0.00 values (TWRC fill values) for CTD and/or DO variables in {zeros_removed} files (of {len(ncfiles)} '
                          'total files)')
-        return status
 
 
 if __name__ == '__main__':

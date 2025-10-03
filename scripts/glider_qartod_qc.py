@@ -121,8 +121,6 @@ def define_gross_flatline_config(instrument_name, model_name):
 
 #def main(args):
 def main(deployments, mode, loglevel, test):
-    status = 0
-
     # loglevel = args.loglevel.upper()
     # mode = args.mode
     # test = args.test
@@ -141,11 +139,11 @@ def main(deployments, mode, loglevel, test):
             data_path, deployment_location = cf.find_glider_deployment_datapath(logging_base, deployment, deployments_root, mode)
 
             if not data_path:
-                logging_base.error(f'{deployment} data directory not found:')
+                logging_base.error(f'{deployment} data directory not found')
                 continue
 
             if not os.path.isdir(os.path.join(deployment_location, 'proc-logs')):
-                logging_base.error(f'{deployment} deployment proc-logs directory not found:')
+                logging_base.error(f'{deployment} deployment proc-logs directory not found')
                 continue
 
             logfilename = logfile_deploymentname(deployment, mode)
@@ -162,9 +160,7 @@ def main(deployments, mode, loglevel, test):
             if os.path.isfile(qctests_config_file):
                 qctests_config_dict = cf.load_yaml_file(qctests_config_file, logger=logging)
                 if not qctests_config_dict['qartod']:
-                    logging.warning(
-                        f'Not running glider QARTOD QC because test is turned off, check: {qctests_config_file}'
-                        )
+                    logging.warning(f'Not running glider QARTOD QC because test is turned off, check: {qctests_config_file}')
                     continue
 
             logging.info('Running glider QARTOD QC: {:s}'.format(os.path.join(data_path, 'qc_queue')))
@@ -174,7 +170,6 @@ def main(deployments, mode, loglevel, test):
 
             if len(ncfiles) == 0:
                 logging.error(' 0 files found to QC: {:s}'.format(os.path.join(data_path, 'qc_queue')))
-                status = 1
                 continue
 
             # Iterate through files and apply QC
@@ -184,7 +179,6 @@ def main(deployments, mode, loglevel, test):
                         ds = ds.load()
                 except OSError as e:
                     logging.error(f'Error reading file {f} ({e})')
-                    status = 1
                     continue
 
                 logging.debug(f'Checking file: {f}')
@@ -313,16 +307,17 @@ def main(deployments, mode, loglevel, test):
 
                     for test, cinfo in config_info['qartod'].items():
                         if test == 'pressure_test':
-                            # check that the pressure values are continually increasing/decreasing
-                            qc_varname = f'{sensor}_qartod_pressure_test'
-                            flag_vals = 2 * np.ones(np.shape(data))
-                            flag_vals[np.invert(non_nan_ind)] = qartod.QartodFlags.MISSING
+                            continue
+                            # # check that the pressure values are continually increasing/decreasing
+                            # qc_varname = f'{sensor}_qartod_pressure_test'
+                            # flag_vals = 2 * np.ones(np.shape(data))
+                            # flag_vals[np.invert(non_nan_ind)] = qartod.QartodFlags.MISSING
 
-                            # only run the test if the array has values
-                            if len(non_nan_i) > 0:
-                                flag_vals[non_nan_ind] = qartod.pressure_test(inp=data[non_nan_ind],
-                                                                              tinp=times[non_nan_ind],
-                                                                              **cinfo)
+                            # # only run the test if the array has values - this currently only works on profile files
+                            # if len(non_nan_i) > 0:
+                            #     flag_vals[non_nan_ind] = qartod.pressure_test(inp=data[non_nan_ind],
+                            #                                                   tinp=times[non_nan_ind],
+                            #                                                   **cinfo)
 
                         elif test == 'climatology_test':
                             qc_varname = f'{sensor}_qartod_climatology_test'
@@ -464,7 +459,6 @@ def main(deployments, mode, loglevel, test):
                 ds.close()
 
             logging.info('QARTOD QC process finished')
-    return status
 
 
 if __name__ == '__main__':
