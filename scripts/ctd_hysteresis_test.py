@@ -2,7 +2,7 @@
 
 """
 Author: lnazzaro and lgarzio on 12/7/2021
-Last modified: lgarzio on 10/1/2025
+Last modified: lgarzio on 10/3/2025
 Flag CTD profile pairs that are severely lagged, which can be an indication of CTD pump issues.
 Each NetCDF file contains one glider segment and potentially multiple profile pairs.
 """
@@ -111,10 +111,10 @@ def set_hysteresis_attrs(test, sensor, thresholds=None):
     attrs = {
         'comment': comment,
         'long_name': long_name,
-        'flag_values': np.byte(flag_values),
+        'flag_values': flag_values,
         'flag_meanings': flag_meanings,
-        'valid_min': np.byte(min(flag_values)),
-        'valid_max': np.byte(max(flag_values)),
+        'valid_min': min(flag_values),
+        'valid_max': max(flag_values),
         'qc_target': sensor,
     }
 
@@ -126,8 +126,6 @@ def set_hysteresis_attrs(test, sensor, thresholds=None):
 
 #def main(args):
 def main(deployments, mode, loglevel, test):
-    status = 0
-
     # loglevel = args.loglevel.upper()
     # mode = args.mode
     # test = args.test
@@ -185,7 +183,6 @@ def main(deployments, mode, loglevel, test):
                 config_file = os.path.join(qc_config_root, 'ctd_hysteresis.yml')
                 if not os.path.isfile(config_file):
                     logging.error(f'Invalid default config file: {config_file}.')
-                    status = 1
                     continue
 
             logging.info(f'Using config file: {config_file}')
@@ -196,7 +193,6 @@ def main(deployments, mode, loglevel, test):
 
             if len(ncfiles) == 0:
                 logging.error(' 0 files found to QC: {:s}'.format(os.path.join(data_path, 'qc_queue')))
-                status = 1
                 continue
 
             test_varnames = ['conductivity', 'temperature']
@@ -208,6 +204,7 @@ def main(deployments, mode, loglevel, test):
                 summary[tv]['failed_profiles'] = 0
                 summary[tv]['suspect_profiles'] = 0
                 summary[tv]['not_evaluated_profiles'] = 0
+                summary[tv]['total_profiles'] = 0
 
             # Iterate through files - each file is a full segment containing multiple profiles
             for f in ncfiles:
@@ -216,9 +213,87 @@ def main(deployments, mode, loglevel, test):
                         ds = ds.load()
                 except OSError as e:
                     logging.error(f'Error reading file {f} ({e})')
-                    status = 1
                     continue
 
+                print(f.split('/')[-1])
+                
+                # identify down and up profiles
+                direction = ''
+                downs = []
+                ups = []
+                downsi = []
+                upsi = []
+                pids = np.unique(ds.profile_id.values)
+                pids = sorted(pids[pids != 0])
+                if len(pids) % 2 != 0:
+                    print('odd number of profiles found in segment')
+                if len(pids) == 0:
+                    logging.debug(f'No profiles indexed in file {f})')
+                    continue
+                
+                for i, pid in enumerate(pids):                    
+                    pidx = np.where(ds.profile_id.values == pid)[0]
+                    if len(np.unique(ds.profile_direction[pidx])) > 1:
+                        logging.error(f'Multiple profile directions found in file: {f} profile_id: {pid}')
+                        raise ValueError(f'Multiple profile directions found in file: {f} profile_id: {pid}')
+                    
+                    # Define up and down profiles
+                    # Check that the previous direction defined is the opposite direction because sometimes
+                    # the glider hovers at one depth then continues on in the same direction, which can cause
+                    # mismatches in pairing profiles. In these cases, skip these profile pairs as the test
+                    # can't reliably be run
+                    elif np.unique(ds.profile_direction[pidx]) == -1:
+                        if direction == '':
+                            direction = 'up'
+                            print('first profile is an upcast, has no previous downcast')
+                        elif direction == 'down':
+                            direction = 'up'
+                            # if the previous profile was a downcast and is in the list, append this upcast
+                            # otherwise, if there was a previous downcast deleted due to consecutive downcasts
+                            # don't include this upcast in the list of profiles to test
+                            if i - 1 in downsi:
+                                ups.append(pid)
+                                upsi.append(i)
+                        else:
+                            print('previous profile was also up')
+                            # if the previous up section is in the list, remove it and the corresponding down section
+                            # don't add this section to the list
+                            if i - 1 in upsi:
+                                ups.pop()
+                                upsi.pop()
+                            if i - 2 in downsi:
+                                downs.pop()
+                                downsi.pop()
+                            
+                    elif np.unique(ds.profile_direction[pidx]) == 1:
+                        if direction != 'down':
+                            direction = 'down'
+                            downs.append(pid)
+                            downsi.append(i)
+                        else:
+                            print('previous profile was also down')
+                            # delete the previous down section of the profile
+                            if i - 1 in downsi:
+                                downs.pop()
+                                downsi.pop()
+
+                if len(downs) != len(ups):
+                    print('number of downs doesnt equal number of ups')
+                print(f'downsi: {downsi}')
+                print(f'upsi: {upsi}')
+
+                # check that each downcast has a corresponding upcast and vice versa
+                for d in downsi:
+                    if d + 1 not in upsi:
+                        logging.debug(f'No corresponding up profile for down profile index {d} in file {f})')
+                        downs.pop(d)
+                        downsi.remove(d)
+                for u in upsi:
+                    if u - 1 not in downsi:
+                        logging.debug(f'No corresponding down profile for up profile index {u} in file {f})')
+                        ups.pop(u)
+                        upsi.remove(u)
+                
                 # Iterate through the test variables
                 for testvar in test_varnames:
                     # get the configuration thresholds
@@ -228,7 +303,6 @@ def main(deployments, mode, loglevel, test):
                         ds[testvar]
                     except KeyError:
                         logging.debug(f'{testvar} not found in file {f})')
-                        status = 1
                         continue
 
                     qc_varname = f'{testvar}_hysteresis_test'
@@ -242,151 +316,124 @@ def main(deployments, mode, loglevel, test):
                         add_da(ds, flag_vals, attrs, testvar, qc_varname)
                         continue
 
-                    # apply qartod QC to pressure
-                    pressure_copy = apply_qartod_qc(ds, 'pressure')
-                    #pressure_idx = np.where(np.invert(np.isnan(pressure_copy.values)))[0]
+                    if len(downs) == 0 or len(ups) == 0:
+                        # leave the flags as NOT_EVALUATED/UNKNOWN (2)
+                        summary[testvar]['not_evaluated_profiles'] += len(pids)
+                        logging.debug(f'No profiles found to test in file (likely due to hovering): {f})')
+                    else:
+                        # apply qartod QC to pressure
+                        pressure_copy = apply_qartod_qc(ds, 'pressure')
+                        #pressure_idx = np.where(np.invert(np.isnan(pressure_copy.values)))[0]
 
-                    # identify down and up profiles
-                    downs = []
-                    ups = []
-                    pids = np.unique(ds.profile_id.values)
-                    pids = pids[pids != 0]
-                    for pid in pids:                    
-                        pidx = np.where(ds.profile_id.values == pid)[0]
-                        if len(np.unique(ds.profile_direction[pidx])) > 1:
-                            logging.error(f'Multiple profile directions found in file: {f} profile_id: {pid}')
-                            raise ValueError(f'Multiple profile directions found in file: {f} profile_id: {pid}')
-                        elif np.unique(ds.profile_direction[pidx]) == -1:
-                            ups.append(pid)
-                        elif np.unique(ds.profile_direction[pidx]) == 1:
-                            downs.append(pid)
+                        # find the down and corresponding up profiles
+                        for i, pid in enumerate(downs):
+                            downidx = np.where(ds.profile_id.values == pid)[0]
+                            upidx = np.where(ds.profile_id.values == ups[i])[0]
+                            summary[testvar]['total_profiles'] += 2
 
-                    # find the down and corresponding up profiles
-                    for i, pid in enumerate(downs):
-                        downidx = np.where(ds.profile_id.values == pid)[0]
-                        upidx = np.where(ds.profile_id.values == ups[i])[0]
-
-                        # make sure both profiles have some valid pressure data that aren't NaN
-                        if np.all(np.isnan(pressure_copy[downidx])):
-                            continue
-                        if np.all(np.isnan(pressure_copy[upidx])):
-                            continue
-                        
-                        # make sure both profiles span >5 dbar
-                        down_pressurediff = np.nanmax(pressure_copy[downidx]) - np.nanmin(pressure_copy[downidx])
-                        up_pressurediff = np.nanmax(pressure_copy[upidx]) - np.nanmin(pressure_copy[upidx])
-
-                        if np.logical_or(down_pressurediff < 5, up_pressurediff < 5):
-                            continue
-
-                        # determine if the profile end/start timestamps are < 5 minutes apart,
-                        # indicating a paired yo (down-up profile pair)
-                        down_time = cf.convert_epoch_ts(ds['time'][downidx])
-                        up_time = cf.convert_epoch_ts(ds['time'][upidx])
-                        if up_time[0] - down_time[-1] > np.timedelta64(5, 'm'):
-                            continue
-                        
-                        # make a copy of the data and apply QARTOD QC flags before testing for hysteresis
-                        down = apply_qartod_qc(ds, testvar, subset_index=downidx)
-                        up = apply_qartod_qc(ds, testvar, subset_index=upidx)
-                        down_non_nan_i = np.where(np.invert(np.isnan(down.values)))[0]
-                        up_non_nan_i = np.where(np.invert(np.isnan(up.values)))[0]
-
-                        # both profiles must have data remaining after QARTOD flags are applied,
-                        # otherwise, test can't be run and leave the flag values as NOT_EVALUATED/UNKNOWN (2)
-                        if np.logical_or(len(down_non_nan_i) == 0, len(up_non_nan_i) == 0):
-                            continue
-
-                        # calculate the area between the two profiles
-                        # merge the QC'd data and QC'd pressure into dataframes
-                        dfdown = down.to_dataframe().merge(pressure_copy[downidx].to_dataframe(), on='time')
-                        dfup= up.to_dataframe().merge(pressure_copy[upidx].to_dataframe(), on='time')
-
-                        # interpolate pressure (in the case where pressure and sci data are offset)
-                        dfdown['pressure'] = dfdown['pressure'].interpolate(method='linear', limit_direction='both', limit=2).values
-                        dfup['pressure'] = dfup['pressure'].interpolate(method='linear', limit_direction='both', limit=2).values
-
-                        # combine dataframes and drop lines with nan
-                        df = pd.concat([dfdown, dfup])
-                        df = df.dropna(subset=['pressure', testvar])
-
-                        # calculate data ranges
-                        pressure_range = np.nanmax(df.pressure) - np.nanmin(df.pressure)
-                        data_range = (np.nanmax(df[testvar].values) - np.nanmin(df[testvar].values))
-
-                        # If the data range is < test_threshold, set flags to 1 (GOOD) since
-                        # there will be no measureable hysteresis (usually in well-mixed water)
-                        if data_range < hysteresis_thresholds['test_threshold']:
-                            flag = qartod.QartodFlags.GOOD
-                            flag_vals[downidx][down_non_nan_i] = flag  ##### THIS ISN'T WORKING
-                            flag_vals[upidx][up_non_nan_i] = flag  #### THIS ISN'T WORKING
-                        
- 
-
-
-
+                            # make sure both profiles have some valid pressure data that aren't NaN
+                            if np.all(np.isnan(pressure_copy[downidx])):
+                                summary[testvar]['not_evaluated_profiles'] += 2
+                                continue
+                            if np.all(np.isnan(pressure_copy[upidx])):
+                                summary[testvar]['not_evaluated_profiles'] += 2
+                                continue
                             
-                           
+                            # make sure both profiles span >5 dbar
+                            down_pressurediff = np.nanmax(pressure_copy[downidx]) - np.nanmin(pressure_copy[downidx])
+                            up_pressurediff = np.nanmax(pressure_copy[upidx]) - np.nanmin(pressure_copy[upidx])
 
-                        
-                        ###### OLD STUFF - NEEDS CLEANING UP ######
+                            if np.logical_or(down_pressurediff < 5, up_pressurediff < 5):
+                                logging.debug(f'Profile(s) are less than 5 dbar: skipping profiles in {f})')
+                                summary[testvar]['not_evaluated_profiles'] += 2
+                                continue
 
-                        # If the data range is >test_threshold, run the test.
-                        if data_range > hysteresis_thresholds['test_threshold']:
-                            polygon_points = df.values.tolist()
-                            polygon_points.append(polygon_points[0])
-                            polygon = Polygon(polygon_points)
-                            polygon_lines = polygon.exterior
-                            polygon_crossovers = polygon_lines.intersection(polygon_lines)
-                            polygons = polygonize(polygon_crossovers)
-                            valid_polygons = MultiPolygon(polygons)
+                            # determine if the profile end/start timestamps are < 5 minutes apart,
+                            # indicating a paired yo (down-up profile pair)
+                            down_time = cf.convert_epoch_ts(ds['time'][downidx])
+                            up_time = cf.convert_epoch_ts(ds['time'][upidx])
+                            if up_time[0] - down_time[-1] > np.timedelta64(5, 'm'):
+                                summary[testvar]['not_evaluated_profiles'] += 2
+                                diff_mins = int(np.round((up_time[0] - down_time[-1]).total_seconds() / 60))
+                                logging.debug(f'The start of the upcast is >5 mins after the end of the downcast ({diff_mins} mins): skipping profiles in {f})')
+                                continue
+                            
+                            # index the non-nan data
+                            down_non_nan_i = np.where(np.invert(np.isnan(ds[testvar][downidx])))[0]
+                            up_non_nan_i = np.where(np.invert(np.isnan(ds[testvar][upidx])))[0]
+                            
+                            # make a copy of the data and apply QARTOD QC flags before testing for hysteresis
+                            down = apply_qartod_qc(ds, testvar, subset_index=downidx)
+                            up = apply_qartod_qc(ds, testvar, subset_index=upidx)
+                            
+                            # both profiles must have data remaining after QARTOD flags are applied,
+                            # otherwise, test can't be run and leave the flag values as NOT_EVALUATED/UNKNOWN (2)
+                            if np.logical_or(len(down_non_nan_i) == 0, len(up_non_nan_i) == 0):
+                                summary[testvar]['not_evaluated_profiles'] += 2
+                                logging.debug(f'Profile(s) do not have data remaining after QC: {testvar} in {f})')
+                                continue
 
-                            # normalize area between the profiles to the pressure range
-                            area = valid_polygons.area / pressure_range
+                            # calculate the area between the two profiles
+                            # merge the QC'd data and QC'd pressure into dataframes
+                            dfdown = down.to_dataframe().merge(pressure_copy[downidx].to_dataframe(), on='time')
+                            dfup= up.to_dataframe().merge(pressure_copy[upidx].to_dataframe(), on='time')
 
-                            # Flag failed profiles
-                            if area > data_range * hysteresis_thresholds['fail_threshold']:
-                                flag = qartod.QartodFlags.FAIL
-                                summary[testvar]['failed_profiles'] += 2
-                            # Flag suspect profiles
-                            elif area > data_range * hysteresis_thresholds['suspect_threshold']:
-                                flag = qartod.QartodFlags.SUSPECT
-                                summary[testvar]['suspect_profiles'] += 2
-                            # Otherwise, both profiles are good
-                            else:
-                                flag = qartod.QartodFlags.GOOD
-                            flag_vals[data_idx] = flag
-                            flag_vals2[data_idx2] = flag
-                        else:
-                            # if data range is < test_threshold, set flags to 1 (GOOD) since
+                            # interpolate pressure (in the case where pressure and sci data are offset)
+                            dfdown['pressure'] = dfdown['pressure'].interpolate(method='linear', limit_direction='both', limit=2).values
+                            dfup['pressure'] = dfup['pressure'].interpolate(method='linear', limit_direction='both', limit=2).values
+
+                            # combine dataframes and drop lines with nan
+                            df = pd.concat([dfdown, dfup])
+                            df = df.dropna(subset=['pressure', testvar])
+
+                            # calculate data ranges
+                            pressure_range = np.nanmax(df.pressure) - np.nanmin(df.pressure)
+                            data_range = (np.nanmax(df[testvar].values) - np.nanmin(df[testvar].values))
+
+                            # If the data range is < test_threshold, set flags to 1 (GOOD) since
                             # there will be no measureable hysteresis (usually in well-mixed water)
-                            flag = qartod.QartodFlags.GOOD
-                            flag_vals[data_idx] = flag
-                            flag_vals2[data_idx2] = flag
+                            if data_range < hysteresis_thresholds['test_threshold']:
+                                flag = qartod.QartodFlags.GOOD
+                                flag_vals[downidx[down_non_nan_i]] = flag
+                                flag_vals[upidx[up_non_nan_i]] = flag
+                            # If the data range is > test_threshold, run the hysteresis test
+                            else:
+                                # Drop columns with 'latitude', 'longitude', or 'depth' in their column names
+                                df = df.drop(columns=[col for col in df.columns if 'latitude' in col or 'longitude' in col or 'depth' in col])
+                                polygon_points = df.values.tolist()
+                                polygon_points.append(polygon_points[0])
+                                polygon = Polygon(polygon_points)
+                                polygon_lines = polygon.exterior
+                                polygon_crossovers = polygon_lines.intersection(polygon_lines)
+                                polygons = polygonize(polygon_crossovers)
+                                valid_polygons = MultiPolygon(polygons)
 
-                        # add data array with hysteresis flag applied
-                        add_da(ds, flag_vals, attrs, testvar, qc_varname)
-                        add_da(ds2, flag_vals2, attrs, testvar, qc_varname)
-                        f2skip += 1
+                                # normalize area between the profiles to the pressure range
+                                area = valid_polygons.area / pressure_range
 
+                                # Flag failed profiles
+                                if area > data_range * hysteresis_thresholds['fail_threshold']:
+                                    flag = qartod.QartodFlags.FAIL
+                                    summary[testvar]['failed_profiles'] += 2
+                                # Flag suspect profiles
+                                elif area > data_range * hysteresis_thresholds['suspect_threshold']:
+                                    flag = qartod.QartodFlags.SUSPECT
+                                    summary[testvar]['suspect_profiles'] += 2
+                                # Otherwise, both profiles are good
+                                else:
+                                    flag = qartod.QartodFlags.GOOD
+                                flag_vals[downidx[down_non_nan_i]] = flag
+                                flag_vals[upidx[up_non_nan_i]] = flag
 
+                    # after checking all profiles in the segment, add data array with hysteresis flag applied
+                    add_da(ds, flag_vals, attrs, testvar, qc_varname)
 
                     # add the hysteresis test to ancillary variable attribute
                     append_ancillary_variables(ds[testvar], qc_varname)
-                    try:
-                        check = ds2[qc_varname]  # check that the qc variable is in the dataset
-                        append_ancillary_variables(ds2[testvar], qc_varname)
-                    except (KeyError, NameError):
-                        pass
 
                     # add the hysteresis test to the salinity and density ancillary variable attribute
                     for v in ['salinity', 'density']:
                         append_ancillary_variables(ds[v], qc_varname)
-                        try:
-                            check = ds2[qc_varname]  # check that the qc variable is in the dataset
-                            append_ancillary_variables(ds2[v], qc_varname)
-                        except (KeyError, NameError):
-                            pass
 
                 # update the history attr and save the dataset(s)
                 now = dt.datetime.now(dt.UTC).strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -400,16 +447,9 @@ def main(deployments, mode, loglevel, test):
 
             for tv in test_varnames:
                 tvs = summary[tv]
-                logging.info('{:s}: {:} not evaluated profiles (of {:} total profiles)'.format(tv,
-                                                                                               tvs['not_evaluated_profiles'],
-                                                                                               len(ncfiles)))
-                logging.info('{:s}: {:} suspect profiles found (of {:} total profiles)'.format(tv,
-                                                                                               tvs['suspect_profiles'],
-                                                                                               len(ncfiles)))
-                logging.info('{:s}: {:} failed profiles found (of {:} total profiles)'.format(tv,
-                                                                                              tvs['failed_profiles'],
-                                                                                              len(ncfiles)))
-    return status
+                logging.info(f'{tv}: {tvs['not_evaluated_profiles']} not evaluated profiles (of {tvs['total_profiles']} total profiles)')
+                logging.info(f'{tv}: {tvs['suspect_profiles']} suspect profiles found (of {tvs['total_profiles']} total profiles)')
+                logging.info(f'{tv}: {tvs['failed_profiles']} failed profiles found (of {tvs['total_profiles']} total profiles)')
 
 
 if __name__ == '__main__':
