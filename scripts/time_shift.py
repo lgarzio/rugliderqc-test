@@ -2,7 +2,7 @@
 
 """
 Author: lnazzaro and lgarzio on 3/9/2022
-Last modified: lgarzio on 10/10/2025
+Last modified: lgarzio on 10/13/2025
 Calculate and apply optimal time shifts by segment for variables defined in config files (e.g. DO and pH voltages).
 Each NetCDF file contains one glider segment and potentially multiple profile pairs.
 """
@@ -245,6 +245,9 @@ def main(deployments, mode, loglevel, test):
                         # Drop lat and lon columns
                         df = df.drop(columns=[col for col in df.columns if 'latitude' in col or 'longitude' in col])
                         df = df.dropna(subset=[testvar])
+
+                        # Drop rows where profile_direction = 0 (hovering or at surface)
+                        df = df[df['profile_direction'] != 0]
 
                         # make a dataframe without QC removed for time shifting after the optimal shift is calculated
                         df_all = ds[testvar].to_dataframe()
