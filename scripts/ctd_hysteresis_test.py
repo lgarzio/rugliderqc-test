@@ -2,7 +2,7 @@
 
 """
 Author: lnazzaro and lgarzio on 12/7/2021
-Last modified: lgarzio on 10/3/2025
+Last modified: lgarzio on 10/15/2025
 Flag CTD profile pairs that are severely lagged, which can be an indication of CTD pump issues.
 Each NetCDF file contains one glider segment and potentially multiple profile pairs.
 """
@@ -141,8 +141,7 @@ def main(deployments, mode, loglevel, test):
         # Set the default qc configuration path
         qc_config_root = os.path.join(data_home, 'qc', 'config')
         if not os.path.isdir(qc_config_root):
-            logging_base.warning('Invalid QC config root: {:s}'.format(qc_config_root))
-            return 1
+            logging_base.warning(f'Invalid QC config root: {qc_config_root}')
 
         #for deployment in args.deployments:
         for deployment in [deployments]:  # for debugging
@@ -279,19 +278,19 @@ def main(deployments, mode, loglevel, test):
 
                 if len(downs) != len(ups):
                     print('number of downs doesnt equal number of ups')
-                print(f'downsi: {downsi}')
-                print(f'upsi: {upsi}')
+                #print(f'downsi: {downsi}')
+                #print(f'upsi: {upsi}')
 
                 # check that each downcast has a corresponding upcast and vice versa
-                for d in downsi:
+                for idx, d in enumerate(downsi):
                     if d + 1 not in upsi:
                         logging.debug(f'No corresponding up profile for down profile index {d} in file {f})')
-                        downs.pop(d)
+                        downs.remove(downs[idx])
                         downsi.remove(d)
-                for u in upsi:
+                for idx, u in enumerate(upsi):
                     if u - 1 not in downsi:
                         logging.debug(f'No corresponding down profile for up profile index {u} in file {f})')
-                        ups.pop(u)
+                        ups.remove(ups[idx])
                         upsi.remove(u)
                 
                 # Iterate through the test variables
