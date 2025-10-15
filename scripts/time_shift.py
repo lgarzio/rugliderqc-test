@@ -222,7 +222,7 @@ def main(deployments, mode, loglevel, test):
                     data_idx = np.where(~np.isnan(ds[testvar].values))[0]
 
                     if len(data_idx) == 0:
-                        logging.debug(f'{testvar} not found in file {fname})')
+                        logging.debug(f'{testvar} values are all nan: {fname})')
                         continue
 
                     # can't calculate time shift if there are no profiles

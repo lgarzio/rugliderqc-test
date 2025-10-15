@@ -165,6 +165,8 @@ def main(deployments, mode, loglevel, test):
                 ds.to_netcdf(f)
                 ds.close()
 
+            logging.info(f'{deployment}: finished summarizing QARTOD flags')
+
 
 if __name__ == '__main__':
     deploy = 'ru44-20250325T0438'  #  ru44-20250306T0038 ru44-20250325T0438 ru39-20250423T1535
