@@ -214,37 +214,9 @@ def main(deployments, mode, loglevel, test):
                         continue
                     logging.debug(f'QC configuration file: {qc_config_file}')
 
-                    # Run ioos_qc gross/flatline tests based on the QC configuration file
-                    c = Config(qc_config_file)
-                    xs = XarrayStream(ds, time='time', lat='latitude', lon='longitude')
-                    qc_results = xs.run(c)
-                    collected_list = collect_results(qc_results, how='list')
-
-                    # Parse each gross/flatline QC result
-                    for cl in collected_list:
-                        sensor = cl.stream_id
-                        test = cl.test
-                        qc_varname = f'{sensor}_{cl.package}_{test}'
-                        # logging.info('Parsing QC results: {:s}'.format(qc_varname))
-                        flag_results = cl.results.data
-
-                        # Defining gross/flatline QC variable attributes
-                        attrs = cf.set_qartod_attrs(test, sensor, c.config[sensor]['qartod'][test])
-                        if not hasattr(ds[sensor], 'ancillary_variables'):
-                            ds[sensor].attrs['ancillary_variables'] = qc_varname
-                        else:
-                            ds[sensor].attrs['ancillary_variables'] = ' '.join((ds[sensor].ancillary_variables, qc_varname))
-
-                        # Create gross/flatline data array
-                        da = xr.DataArray(flag_results.astype('int32'), coords=ds[sensor].coords, dims=ds[sensor].dims,
-                                          name=qc_varname,
-                                          attrs=attrs)
-
-                        # define variable encoding
-                        cf.set_encoding(da)
-
-                        # Add gross/flatline QC variable to the original dataset
-                        ds[qc_varname] = da
+                    # run gross/flatline tests
+                    # this function adds the QC variables to the dataset
+                    cf.run_ioos_qc_gross_flatline(ds, qc_config_file)
 
                 # manually run gross range test for pressure based on depth_rating in file
                 test = 'gross_range_test'
