@@ -2,7 +2,7 @@
 
 """
 Author: lnazzaro and lgarzio on 12/7/2021
-Last modified: lgarzio on 10/15/2025
+Last modified: lgarzio on 10/17/2025
 Flag CTD profile pairs that are severely lagged, which can be an indication of CTD pump issues.
 Each NetCDF file contains one glider segment and potentially multiple profile pairs.
 """
@@ -214,7 +214,7 @@ def main(deployments, mode, loglevel, test):
                     logging.error(f'Error reading file {f} ({e})')
                     continue
 
-                print(f.split('/')[-1])
+                # print(f.split('/')[-1])
                 
                 # identify down and up profiles
                 direction = ''
@@ -225,7 +225,7 @@ def main(deployments, mode, loglevel, test):
                 pids = np.unique(ds.profile_id.values)
                 pids = sorted(pids[pids != 0])
                 if len(pids) % 2 != 0:
-                    print('odd number of profiles found in segment')
+                    logging.info(f'odd number of profiles found in segment: {f}')
                 if len(pids) == 0:
                     logging.debug(f'No profiles indexed in file {f})')
                     continue
@@ -244,7 +244,7 @@ def main(deployments, mode, loglevel, test):
                     elif np.unique(ds.profile_direction[pidx]) == -1:
                         if direction == '':
                             direction = 'up'
-                            print('first profile is an upcast, has no previous downcast')
+                            logging.info(f'first profile in segment is an upcast, has no previous downcast: {f}')
                         elif direction == 'down':
                             direction = 'up'
                             # if the previous profile was a downcast and is in the list, append this upcast
@@ -254,7 +254,7 @@ def main(deployments, mode, loglevel, test):
                                 ups.append(pid)
                                 upsi.append(i)
                         else:
-                            print('previous profile was also up')
+                            logging.info(f'previous profile was also up: {f}')
                             # if the previous up section is in the list, remove it and the corresponding down section
                             # don't add this section to the list
                             if i - 1 in upsi:
@@ -270,16 +270,14 @@ def main(deployments, mode, loglevel, test):
                             downs.append(pid)
                             downsi.append(i)
                         else:
-                            print('previous profile was also down')
+                            logging.info(f'previous profile was also down: {f}')
                             # delete the previous down section of the profile
                             if i - 1 in downsi:
                                 downs.pop()
                                 downsi.pop()
 
                 if len(downs) != len(ups):
-                    print('number of downs doesnt equal number of ups')
-                #print(f'downsi: {downsi}')
-                #print(f'upsi: {upsi}')
+                    logging.info(f'number of downs doesnt equal number of ups: {f}')
 
                 # check that each downcast has a corresponding upcast and vice versa
                 for idx, d in enumerate(downsi):
