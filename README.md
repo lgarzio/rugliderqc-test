@@ -10,24 +10,31 @@ This code is designed to run on glider NetCDF files with indexed profiles with a
 `git clone https://github.com/lgarzio/rugliderqc-test.git`
 
 Also clone my forked version of ioos_qc
+
 `git clone https://github.com/lgarzio/ioos_qc.git`
 
 Navigate to the cloned repo on your local machine
+
 `cd rugliderqc-test`
 
 Create the environment
+
 `conda env create -f environment.yml`
 
 Activate the environment
+
 `conda activate rugliderqc-test`
 
 Install the local package in your environment
+
 `pip install .`
 
 Navigate to the forked version of ioos_qc
+
 `cd ioos_qc`
 
 Install the forked version of ioos_qc in the environment in editable mode (if you want to make edits)
+
 `pip install -e .`
 
 ## Usage
