@@ -36,15 +36,13 @@ Install the forked version of ioos_qc in the environment in editable mode (if yo
 
 This wrapper script runs:
 
-1. [check_science_variables.py](https://github.com/rucool/rugliderqc/blob/master/scripts/check_science_variables.py)
-2. [check_duplicate_timestamps.py](https://github.com/rucool/rugliderqc/blob/master/scripts/check_duplicate_timestamps.py)
-3. [glider_qartod_qc.py](https://github.com/rucool/rugliderqc/blob/master/scripts/glider_qartod_qc.py)
-4. [interpolate_depth.py](https://github.com/rucool/rugliderqc/blob/master/scripts/interpolate_depth.py)
-5. [ctd_hysteresis_test.py](https://github.com/rucool/rugliderqc/blob/master/scripts/ctd_hysteresis_test.py)
-6. [summarize_qartod_flags.py](https://github.com/rucool/rugliderqc/blob/master/scripts/summarize_qartod_flags.py)
-7. [time_shift.py](https://github.com/rucool/rugliderqc/blob/master/scripts/time_shift.py)
-8. [add_derived_variables.py](https://github.com/rucool/rugliderqc/blob/master/scripts/add_derived_variables.py)
-9. [move_nc_files.py](https://github.com/rucool/rugliderqc/blob/master/scripts/move_nc_files.py)
+1. [remove_zeros.py](https://github.com/lgarzio/rugliderqc-test/blob/master/scripts/remove_zeros.py)
+2. [glider_qartod_qc.py](https://github.com/lgarzio/rugliderqc-test/blob/master/scripts/glider_qartod_qc.py)
+3. [ctd_hysteresis_test.py](https://github.com/lgarzio/rugliderqc-test/blob/master/scripts/ctd_hysteresis_test.py)
+4. [summarize_qartod_flags.py](https://github.com/lgarzio/rugliderqc-test/blob/master/scripts/summarize_qartod_flags.py)
+5. [time_shift.py](https://github.com/lgarzio/rugliderqc-test/blob/master/scripts/time_shift.py)
+6. [add_derived_variables.py](https://github.com/lgarzio/rugliderqc-test/blob/master/scripts/add_derived_variables.py)
+7. [move_nc_files.py](https://github.com/lgarzio/rugliderqc-test/blob/master/scripts/move_nc_files.py)
 
 ## Acknowledgements
 
