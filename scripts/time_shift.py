@@ -118,15 +118,15 @@ def depth_bins(df, interval=0.25):
     return df
 
 
-#def main(args):
-def main(deployments, mode, loglevel, test):
-    # loglevel = args.loglevel.upper()
-    # mode = args.mode
-    # test = args.test
-    loglevel = loglevel.upper()  # for debugging
+def main(args):
+# def main(deployments, mode, loglevel, test):
+    loglevel = args.loglevel.upper()
+    mode = args.mode
+    test = args.test
+    loglevel = loglevel.upper()
 
-    logFile_base = os.path.join(os.path.expanduser('~'), 'glider_proc_log')  # for debugging
-    # logFile_base = logfile_basename()
+    # logFile_base = os.path.join(os.path.expanduser('~'), 'glider_proc_log')  # for debugging
+    logFile_base = logfile_basename()
     logging_base = setup_logger('logging_base', loglevel, logFile_base)
 
     data_home, deployments_root = cf.find_glider_deployments_rootdir(logging_base, test)
@@ -137,8 +137,8 @@ def main(deployments, mode, loglevel, test):
         if not os.path.isdir(qc_config_root):
             logging_base.warning(f'Invalid QC config root: {qc_config_root}')
 
-        #for deployment in args.deployments:
-        for deployment in [deployments]:  # for debugging
+        for deployment in args.deployments:
+        # for deployment in [deployments]:  # for debugging
 
             data_path, deployment_location = cf.find_glider_deployment_datapath(logging_base, deployment, deployments_root, mode)
 
@@ -428,6 +428,7 @@ def main(deployments, mode, loglevel, test):
                     ds.attrs['history'] = f'{ds.attrs["history"]} {now}: {os.path.basename(__file__)}'
 
                 ds.to_netcdf(f)
+
                 ds.close()
                 files_tested += 1
 
@@ -435,33 +436,33 @@ def main(deployments, mode, loglevel, test):
 
 
 if __name__ == '__main__':
-    deploy = 'ru44-20250325T0438'  #  ru44-20250306T0038 ru44-20250325T0438 ru39-20250423T1535
-    mode = 'rt'  # delayed rt
-    ll = 'debug'
-    test = True
-    main(deploy, mode, ll, test)
-    # arg_parser = argparse.ArgumentParser(description=main.__doc__,
-    #                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    # deploy = 'ru39-20250423T1535'  #  ru44-20250306T0038 ru44-20250325T0438 ru39-20250423T1535
+    # mode = 'delayed'  # delayed rt
+    # ll = 'debug'
+    # test = True
+    # main(deploy, mode, ll, test)
+    arg_parser = argparse.ArgumentParser(description=main.__doc__,
+                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    # arg_parser.add_argument('deployments',
-    #                         nargs='+',
-    #                         help='Glider deployment name(s) formatted as glider-YYYYmmddTHHMM')
+    arg_parser.add_argument('deployments',
+                            nargs='+',
+                            help='Glider deployment name(s) formatted as glider-YYYYmmddTHHMM')
 
-    # arg_parser.add_argument('-m', '--mode',
-    #                         help='Deployment dataset status',
-    #                         choices=['rt', 'delayed'],
-    #                         default='rt')
+    arg_parser.add_argument('-m', '--mode',
+                            help='Dataset mode: real-time (rt) or delayed-mode (delayed)',
+                            choices=['rt', 'delayed'],
+                            default='rt')
 
-    # arg_parser.add_argument('-l', '--loglevel',
-    #                         help='Verbosity level',
-    #                         type=str,
-    #                         choices=['debug', 'info', 'warning', 'error', 'critical'],
-    #                         default='info')
+    arg_parser.add_argument('-l', '--loglevel',
+                            help='Verbosity level',
+                            type=str,
+                            choices=['debug', 'info', 'warning', 'error'],
+                            default='info')
 
-    # arg_parser.add_argument('-test', '--test',
-    #                         help='Point to the environment variable key GLIDER_DATA_HOME_TEST for testing.',
-    #                         action='store_true')
+    arg_parser.add_argument('-test', '--test',
+                            help='Point to the environment variable key GLIDER_DATA_HOME_TEST for testing.',
+                            action='store_true')
 
-    # parsed_args = arg_parser.parse_args()
+    parsed_args = arg_parser.parse_args()
 
-    # sys.exit(main(parsed_args))
+    sys.exit(main(parsed_args))
