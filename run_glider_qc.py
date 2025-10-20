@@ -18,14 +18,14 @@ arg_parser.add_argument('deployments',
                         help='Glider deployment name(s) formatted as glider-YYYYmmddTHHMM')
 
 arg_parser.add_argument('-m', '--mode',
-                        help='Deployment dataset status',
+                        help='Dataset mode: real-time (rt) or delayed-mode (delayed)',
                         choices=['rt', 'delayed'],
                         default='rt')
 
 arg_parser.add_argument('-l', '--loglevel',
                         help='Verbosity level',
                         type=str,
-                        choices=['debug', 'info', 'warning', 'error', 'critical'],
+                        choices=['debug', 'info', 'warning', 'error'],
                         default='info')
 
 arg_parser.add_argument('-test', '--test',
