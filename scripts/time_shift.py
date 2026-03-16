@@ -2,7 +2,7 @@
 
 """
 Author: lnazzaro and lgarzio on 3/9/2022
-Last modified: lgarzio on 10/13/2025
+Last modified: lgarzio on 3/16/2026
 Calculate and apply optimal time shifts by segment for variables defined in config files (e.g. DO and pH voltages).
 Each NetCDF file contains one glider segment and potentially multiple profile pairs.
 """
@@ -239,109 +239,115 @@ def main(args):
                         # make a copy of the data and apply QARTOD QC flags
                         data_copy = apply_qc(ds, testvar)
 
-                        # convert to dataframe with profile direction
-                        df = data_copy.to_dataframe().merge(ds.profile_direction.to_dataframe(), on=['time', 'depth'])
+                        # make sure there are still values after applying QC
+                        if len(np.where(~np.isnan(data_copy))[0]) == 0:
+                            logging.debug(f'{testvar} values are all nan after applying QC flags: {fname})')
+                            optimal_shift = np.nan
+                        else:
 
-                        # Drop lat and lon columns
-                        df = df.drop(columns=[col for col in df.columns if 'latitude' in col or 'longitude' in col])
-                        df = df.dropna(subset=[testvar])
+                            # convert to dataframe with profile direction
+                            df = data_copy.to_dataframe().merge(ds.profile_direction.to_dataframe(), on=['time', 'depth'])
 
-                        # Drop rows where profile_direction = 0 (hovering or at surface)
-                        df = df[df['profile_direction'] != 0]
+                            # Drop lat and lon columns
+                            df = df.drop(columns=[col for col in df.columns if 'latitude' in col or 'longitude' in col])
+                            df = df.dropna(subset=[testvar])
 
-                        # make a dataframe without QC removed for time shifting after the optimal shift is calculated
-                        df_all = ds[testvar].to_dataframe()
-                        df_all = df_all.dropna(subset=[testvar])
+                            # Drop rows where profile_direction = 0 (hovering or at surface)
+                            df = df[df['profile_direction'] != 0]
 
-                        # convert profile_direction to a down identifier (1 = down, 0 = up)
-                        df['profile_direction'] = df['profile_direction'].replace(-1, 0)
-                        df.rename(columns={'profile_direction': 'downs'}, inplace=True)
+                            # make a dataframe without QC removed for time shifting after the optimal shift is calculated
+                            df_all = ds[testvar].to_dataframe()
+                            df_all = df_all.dropna(subset=[testvar])
 
-                        # convert timestamps
-                        df.index = cf.convert_epoch_ts(df.index)
-                        df_all.index = cf.convert_epoch_ts(df_all.index)
+                            # convert profile_direction to a down identifier (1 = down, 0 = up)
+                            df['profile_direction'] = df['profile_direction'].replace(-1, 0)
+                            df.rename(columns={'profile_direction': 'downs'}, inplace=True)
 
-                        min_time = pd.to_datetime(np.nanmin(df.index)).strftime('%Y-%m-%dT%H:%M:%S')
-                        max_time = pd.to_datetime(np.nanmax(df.index)).strftime('%Y-%m-%dT%H:%M:%S')
+                            # convert timestamps
+                            df.index = cf.convert_epoch_ts(df.index)
+                            df_all.index = cf.convert_epoch_ts(df_all.index)
 
-                        # removes duplicates and syncs the dataframes so they can be merged when shifted
-                        df_resample = df.resample('1s').mean()
+                            min_time = pd.to_datetime(np.nanmin(df.index)).strftime('%Y-%m-%dT%H:%M:%S')
+                            max_time = pd.to_datetime(np.nanmax(df.index)).strftime('%Y-%m-%dT%H:%M:%S')
 
-                        # For each shift, shift the master dataframes by x seconds, bin data by 0.25 dbar,
-                        # calculate area between curves
-                        areas = []
-                        for shift in shifts:
-                            kwargs = dict()
-                            kwargs['merge_original'] = True
-                            df_shift = apply_time_shift(df_resample, testvar, shift, **kwargs)
+                            # removes duplicates and syncs the dataframes so they can be merged when shifted
+                            df_resample = df.resample('1s').mean()
 
-                            # interpolate depth
-                            df_shift['depth'] = df_shift['depth'].interpolate(method='linear', limit_direction='both')
-                            df_shift.dropna(subset=[f'{testvar}_shifted'], inplace=True)
+                            # For each shift, shift the master dataframes by x seconds, bin data by 0.25 dbar,
+                            # calculate area between curves
+                            areas = []
+                            for shift in shifts:
+                                kwargs = dict()
+                                kwargs['merge_original'] = True
+                                df_shift = apply_time_shift(df_resample, testvar, shift, **kwargs)
 
-                            # find down identifiers that were averaged in the resampling and reset
-                            downs = np.array(df_shift['downs'])
-                            ind = np.argwhere(downs == 0.5).flatten()
-                            downs[ind] = downs[ind - 1]
-                            df_shift['downs'] = downs
+                                # interpolate depth
+                                df_shift['depth'] = df_shift['depth'].interpolate(method='linear', limit_direction='both')
+                                df_shift.dropna(subset=[f'{testvar}_shifted'], inplace=True)
 
-                            # after shifting and interpolating depth, divide df into down and up profiles
-                            downs_df = df_shift[df_shift['downs'] == 1].copy()
-                            ups_df = df_shift[df_shift['downs'] == 0].copy()
+                                # find down identifiers that were averaged in the resampling and reset
+                                downs = np.array(df_shift['downs'])
+                                ind = np.argwhere(downs == 0.5).flatten()
+                                downs[ind] = downs[ind - 1]
+                                df_shift['downs'] = downs
 
-                            # don't calculate area if a down or up profile group is missing
-                            if np.logical_or(len(downs_df) == 0, len(ups_df) == 0):
-                                area = np.nan
-                            else:
-                                # check the depth range
-                                downs_depth_range = calculate_depth_range(downs_df)
-                                ups_depth_range = calculate_depth_range(ups_df)
+                                # after shifting and interpolating depth, divide df into down and up profiles
+                                downs_df = df_shift[df_shift['downs'] == 1].copy()
+                                ups_df = df_shift[df_shift['downs'] == 0].copy()
 
-                                # don't calculate area if either profile grouping spans <5m
-                                if np.logical_or(downs_depth_range < 5, ups_depth_range < 5):
+                                # don't calculate area if a down or up profile group is missing
+                                if np.logical_or(len(downs_df) == 0, len(ups_df) == 0):
                                     area = np.nan
                                 else:
-                                    # bin data frames
-                                    downs_binned = depth_bins(downs_df)
-                                    downs_binned.dropna(inplace=True)
-                                    ups_binned = depth_bins(ups_df)
-                                    ups_binned.dropna(inplace=True)
+                                    # check the depth range
+                                    downs_depth_range = calculate_depth_range(downs_df)
+                                    ups_depth_range = calculate_depth_range(ups_df)
 
-                                    downs_ups = pd.concat([downs_binned, ups_binned.iloc[::-1]])  # downs_ups = downs_binned.append(ups_binned.iloc[::-1])
+                                    # don't calculate area if either profile grouping spans <5m
+                                    if np.logical_or(downs_depth_range < 5, ups_depth_range < 5):
+                                        area = np.nan
+                                    else:
+                                        # bin data frames
+                                        downs_binned = depth_bins(downs_df)
+                                        downs_binned.dropna(inplace=True)
+                                        ups_binned = depth_bins(ups_df)
+                                        ups_binned.dropna(inplace=True)
 
-                                    # calculate area between curves
-                                    polygon_points = downs_ups.values.tolist()
-                                    polygon_points.append(polygon_points[0])
-                                    polygon = Polygon(polygon_points)
-                                    polygon_lines = polygon.exterior
-                                    polygon_crossovers = polygon_lines.intersection(polygon_lines)
-                                    polygons = polygonize(polygon_crossovers)
-                                    valid_polygons = MultiPolygon(polygons)
-                                    area = valid_polygons.area
+                                        downs_ups = pd.concat([downs_binned, ups_binned.iloc[::-1]])  # downs_ups = downs_binned.append(ups_binned.iloc[::-1])
 
-                            areas.append(area)
+                                        # calculate area between curves
+                                        polygon_points = downs_ups.values.tolist()
+                                        polygon_points.append(polygon_points[0])
+                                        polygon = Polygon(polygon_points)
+                                        polygon_lines = polygon.exterior
+                                        polygon_crossovers = polygon_lines.intersection(polygon_lines)
+                                        polygons = polygonize(polygon_crossovers)
+                                        valid_polygons = MultiPolygon(polygons)
+                                        area = valid_polygons.area
 
-                        # if >50% of the values are nan, return nan
-                        fraction_nan = np.sum(np.isnan(areas)) / len(areas)
-                        if fraction_nan > .5:
-                            optimal_shift = np.nan
+                                areas.append(area)
 
-                            logging.debug(f'Optimal time shift for {testvar} {min_time} to {max_time}: undetermined')
-                        else:
-                            # find the shift that results in the minimum area between the curves
-                            optimal_shift = int(np.nanargmin(areas))
+                            # if >50% of the values are nan, return nan
+                            fraction_nan = np.sum(np.isnan(areas)) / len(areas)
+                            if fraction_nan > .5:
+                                optimal_shift = np.nan
 
-                            # if the optimal shift is zero or last shift tested (couldn't find a minimal
-                            # area within the times tested), use the closest non-nan shift from the
-                            # previous segments
-                            if np.logical_or(optimal_shift == 0, optimal_shift == np.nanmax(seconds)):
-                                non_nans = ~np.isnan(segment_shifts[testvar])
-                                try:
-                                    optimal_shift = int(segment_shifts[testvar][non_nans][-1])
-                                except IndexError:
-                                    # if there are no previous non-nan optimal shifts, use the default
-                                    # value from the config file
-                                    optimal_shift = shift_dict[testvar]['default_shift']
+                                logging.debug(f'Optimal time shift for {testvar} {min_time} to {max_time}: undetermined')
+                            else:
+                                # find the shift that results in the minimum area between the curves
+                                optimal_shift = int(np.nanargmin(areas))
+
+                                # if the optimal shift is zero or last shift tested (couldn't find a minimal
+                                # area within the times tested), use the closest non-nan shift from the
+                                # previous segments
+                                if np.logical_or(optimal_shift == 0, optimal_shift == np.nanmax(seconds)):
+                                    non_nans = ~np.isnan(segment_shifts[testvar])
+                                    try:
+                                        optimal_shift = int(segment_shifts[testvar][non_nans][-1])
+                                    except IndexError:
+                                        # if there are no previous non-nan optimal shifts, use the default
+                                        # value from the config file
+                                        optimal_shift = shift_dict[testvar]['default_shift']
                     
                     # keep track of optimal time shifts
                     segment_shifts[testvar] = np.append(segment_shifts[testvar], optimal_shift)
