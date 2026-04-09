@@ -2,7 +2,7 @@
 
 """
 Author: lnazzaro and lgarzio on 3/9/2022
-Last modified: lgarzio on 3/16/2026
+Last modified: lgarzio on 4/6/2026
 Calculate and apply optimal time shifts by segment for variables defined in config files (e.g. DO and pH voltages).
 Each NetCDF file contains one glider segment and potentially multiple profile pairs.
 """
@@ -225,13 +225,17 @@ def main(args):
                         logging.debug(f'{testvar} values are all nan: {fname})')
                         continue
 
+                    # find indices of profiles with valid profile direction values (not nan or 0)
+                    profilesidx = np.where(np.logical_and(~np.isnan(ds.profile_direction.values), ds.profile_direction.values != 0))[0]
+                    check_profiles = ds.profile_direction.values[profilesidx]
+
                     # can't calculate time shift if there are no profiles
-                    if np.all(ds.profile_direction.values == 0):
+                    if len(check_profiles) == 0:
                         logging.debug(f'No profiles indexed for segment {fname}, optimal time shift not calculated')
                         optimal_shift = np.nan
                 
                     # can't calculate time shift if there are only ups or downs
-                    elif len(np.unique(ds['profile_direction'])) == 1:
+                    elif len(np.unique(check_profiles)) == 1:
                         logging.debug(f'Only ups or downs available for segment {fname}, optimal time shift not calculated')
                         optimal_shift = np.nan
 
