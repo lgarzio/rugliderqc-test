@@ -71,7 +71,6 @@ def main(args):
 
             if len(ncfiles) == 0:
                 logging.error(f'0 files found: {data_path}')
-                status = 1
                 continue
 
             logging.info('Adding manual QC flags')
@@ -143,8 +142,6 @@ def main(args):
                     ds.to_netcdf(f)
 
             logging.info('Finished adding manual QC flags')
-
-        return status
 
 
 if __name__ == '__main__':
