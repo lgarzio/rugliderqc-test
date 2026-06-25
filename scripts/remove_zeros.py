@@ -2,10 +2,11 @@
 
 """
 Author: lgarzio on 12/22/2021
-Last modified: lgarzio on 9/12/2025
+Last modified: lgarzio on 6/25/2026
 Converts CTD science variables to fill values if conductivity and temperature are both 0.000, 
 and dissolved oxygen science variables to fill values if
 oxygen_concentration and optode_water_temperature are both 0.000.
+Also check for SUNA nitrate values of -1 and convert to fill values
 """
 
 import os
@@ -120,6 +121,15 @@ def main(args):
 
             oxygen_vars = cf.load_yaml_file(oxygen_config_file, logger=logging)
 
+            # Get nitrate variable names
+            nitrate_config_file = os.path.join(qc_config_root, 'nitrate_variables.yml')
+            if not os.path.isfile(nitrate_config_file):
+                logging.error(f'Invalid nitrate variable name config file: {nitrate_config_file}.')
+                continue
+
+            nitrate_vars = cf.load_yaml_file(nitrate_config_file, logger=logging)
+            nitrate_vars = nitrate_vars.split(' ')
+
             # List the netcdf files in qc_queue
             ncfiles = sorted(glob.glob(os.path.join(data_path, 'qc_queue', '*.nc')))
 
@@ -129,6 +139,8 @@ def main(args):
 
             # Iterate through files and check for values of 0.0
             zeros_removed = 0
+            nitrate_available = 0
+            negone_removed = 0
             for f in ncfiles:
                 logging.debug(f'{f}')
                 modified = 0
@@ -156,8 +168,20 @@ def main(args):
                     ds.to_netcdf(f)
                     zeros_removed += 1
 
+                for nv in nitrate_vars:
+                    if nv in ds.variables:
+                        nitrate_available += 1
+                        nitrate_negone_idx = np.where(ds[nv] == -1)[0]
+                        if len(nitrate_negone_idx) > 0:
+                            ds[nv][nitrate_negone_idx] = ds[nv].encoding['_FillValue']
+                            ds.to_netcdf(f)
+                            negone_removed += 1
+
             logging.info(f'Removed 0.00 values (TWRC fill values) for CTD and/or DO variables in {zeros_removed} files (of {len(ncfiles)} '
                          'total files)')
+            if nitrate_available > 0:
+                logging.info(f'Removed -1 values for nitrate variables in {negone_removed} files (of {len(ncfiles)} '
+                            'total files)')
 
 
 if __name__ == '__main__':
