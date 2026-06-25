@@ -103,7 +103,7 @@ def main(args):
                         )
                     continue
 
-            logging.info('Checking for TWRC fill values of 0.00: {:s}'.format(os.path.join(data_path, 'qc_queue')))
+            logging.info('Checking for TWRC fill values of 0.00 and nitrate values of -1: {:s}'.format(os.path.join(data_path, 'qc_queue')))
 
             # Get all of the possible CTD variable names from the config file
             ctd_config_file = os.path.join(qc_config_root, 'ctd_variables.yml')
