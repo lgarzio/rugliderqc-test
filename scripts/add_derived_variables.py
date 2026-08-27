@@ -401,8 +401,8 @@ def main(args):
 
                     ds.to_netcdf(f)
                 
-                outcsv = f.replace('.nc', '.csv')
-                ds.to_dataframe().to_csv(outcsv)
+                #outcsv = f.replace('.nc', '.csv')
+                #ds.to_dataframe().to_csv(outcsv)
 
             if len(new_vars_final) == 0:
                 new_vars_final = ['no additional sci vars to calculate']
