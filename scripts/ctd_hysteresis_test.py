@@ -2,7 +2,7 @@
 
 """
 Author: lnazzaro and lgarzio on 12/7/2021
-Last modified: lgarzio on 10/17/2025
+Last modified: lgarzio on 9/21/2026
 Flag CTD profile pairs that are severely lagged, which can be an indication of CTD pump issues.
 Each NetCDF file contains one glider segment and potentially multiple profile pairs.
 """
@@ -365,7 +365,7 @@ def main(args):
                             
                             # both profiles must have data remaining after QARTOD flags are applied,
                             # otherwise, test can't be run and leave the flag values as NOT_EVALUATED/UNKNOWN (2)
-                            if np.logical_or(len(down_non_nan_i) == 0, len(up_non_nan_i) == 0):
+                            if np.logical_or(np.sum(~np.isnan(down)) == 0, np.sum(~np.isnan(up)) == 0):
                                 summary[testvar]['not_evaluated_profiles'] += 2
                                 logging.debug(f'Profile(s) do not have data remaining after QC: {testvar} in {f})')
                                 continue
