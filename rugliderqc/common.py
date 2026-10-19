@@ -25,7 +25,8 @@ def convert_epoch_ts(data):
     return time
 
 
-def find_glider_deployment_datapath(logger, deployment, deployments_root, mode):
+
+def find_glider_deployment_datapath(logger, deployment, deployments_root, processing_type, mode):
     glider_regex = re.compile(r'^(.*)-(\d{8}T\d{4})')
     match = glider_regex.search(deployment)
     if match:
@@ -47,7 +48,7 @@ def find_glider_deployment_datapath(logger, deployment, deployments_root, mode):
                 deployment_location = os.path.join(deployments_root, deployment_name)
                 if os.path.isdir(deployment_location):
                     # Set the deployment netcdf data path
-                    data_path = os.path.join(deployment_location, 'data', 'out', mode)
+                    data_path = os.path.join(deployment_location, 'data', 'out', processing_type, mode)
                     if not os.path.isdir(data_path):
                         logger.warning('{:s} data directory not found: {:s}'.format(trajectory, data_path))
                         data_path = None

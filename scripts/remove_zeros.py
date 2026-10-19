@@ -2,7 +2,7 @@
 
 """
 Author: lgarzio on 12/22/2021
-Last modified: lgarzio on 6/25/2026
+Last modified: lgarzio on 10/19/2026
 Converts CTD science variables to fill values if conductivity and temperature are both 0.000, 
 and dissolved oxygen science variables to fill values if
 oxygen_concentration and optode_water_temperature are both 0.000.
@@ -49,8 +49,9 @@ def check_zeros(varname_dict, dataset, ds_modified, var1, var2):
 
 
 def main(args):
-# def main(deployments, mode, loglevel, test):
+#def main(deployments, processing_type, mode, loglevel, test):
     loglevel = args.loglevel.upper()
+    processing_type = args.processing_type
     mode = args.mode
     test = args.test
     loglevel = loglevel.upper()
@@ -72,7 +73,7 @@ def main(args):
         # for deployment in [deployments]:  # for debugging
 
             # find the location of the files to be processed
-            data_path, deployment_location = cf.find_glider_deployment_datapath(logging_base, deployment, deployments_root, mode)
+            data_path, deployment_location = cf.find_glider_deployment_datapath(logging_base, deployment, deployments_root, processing_type, mode)
 
             if not data_path:
                 logging_base.error(f'{deployment} data directory not found:')
@@ -82,7 +83,7 @@ def main(args):
                 logging_base.error(f'{deployment} deployment proc-logs directory not found:')
                 continue
 
-            logfilename = logfile_deploymentname(deployment, mode)
+            logfilename = logfile_deploymentname(deployment, processing_type, mode)
             logFile = os.path.join(deployment_location, 'proc-logs', logfilename)
             logging = setup_logger('logging', loglevel, logFile)
 
@@ -187,6 +188,7 @@ def main(args):
 if __name__ == '__main__':
     # deploy = 'ru39-20250423T1535'  #  ru44-20250306T0038 ru44-20250325T0438 ru39-20250423T1535
     # mode = 'delayed'  # delayed rt
+    # processing_type = 'ngdac'  # ngdac or ru
     # ll = 'info'
     # test = True
     # main(deploy, mode, ll, test)
@@ -197,6 +199,11 @@ if __name__ == '__main__':
                             nargs='+',
                             help='Glider deployment name(s) formatted as glider-YYYYmmddTHHMM')
 
+    arg_parser.add_argument('-p', '--processing_type',
+                            help='Generate files to send to the RU server or NGDAC server',
+                            choices=['ru', 'ngdac'],
+                            default='ru')
+    
     arg_parser.add_argument('-m', '--mode',
                             help='Dataset mode: real-time (rt) or delayed-mode (delayed)',
                             choices=['rt', 'delayed'],

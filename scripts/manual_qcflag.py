@@ -2,7 +2,7 @@
 
 """
 Author: lgarzio on 5/1/2024
-Last modified: lgarzio on 6/22/2026
+Last modified: lgarzio on 10/19/2026
 Add a manual comment to a deployment and the option to convert values to nan using the manual_flag.yml config file
 located in $HOME/deployments/YYYY/glider-YYYYMMDDTHHMM/config/qc
 """
@@ -22,6 +22,7 @@ pd.set_option('display.width', 320, "display.max_columns", 10)
 
 def main(args):
     loglevel = args.loglevel.upper()
+    processing_type = args.processing_type
     mode = args.mode
     test = args.test
 
@@ -38,7 +39,7 @@ def main(args):
 
         for deployment in args.deployments:
 
-            data_path, deployment_location = cf.find_glider_deployment_datapath(logging_base, deployment, deployments_root, mode)
+            data_path, deployment_location = cf.find_glider_deployment_datapath(logging_base, deployment, deployments_root, processing_type,mode)
 
             if not data_path:
                 logging_base.error(f'{deployment} data directory not found:')
@@ -48,7 +49,7 @@ def main(args):
                 logging_base.error(f'{deployment} deployment proc-logs directory not found:')
                 continue
 
-            logfilename = logfile_deploymentname(deployment, mode)
+            logfilename = logfile_deploymentname(deployment, processing_type, mode)
             logFile = os.path.join(deployment_location, 'proc-logs', logfilename)
             logging = setup_logger('logging', loglevel, logFile)
 
@@ -151,6 +152,11 @@ if __name__ == '__main__':
     arg_parser.add_argument('deployments',
                             nargs='+',
                             help='Glider deployment name(s) formatted as glider-YYYYmmddTHHMM')
+
+    arg_parser.add_argument('-p', '--processing_type',
+                            help='Generate files to send to the RU server or NGDAC server',
+                            choices=['ru', 'ngdac'],
+                            default='ru')
 
     arg_parser.add_argument('-m', '--mode',
                             help='Deployment dataset status',

@@ -2,7 +2,7 @@
 
 """
 Author: lgarzio on 12/7/2021
-Last modified: lgarzio 10/17/2025
+Last modified: lgarzio 10/19/2026
 This is a wrapper script that imports tools to quality control RUCOOL's glider data.
 """
 
@@ -16,6 +16,11 @@ arg_parser = argparse.ArgumentParser(description="QC RUCOOL's glider data",
 arg_parser.add_argument('deployments',
                         nargs='+',
                         help='Glider deployment name(s) formatted as glider-YYYYmmddTHHMM')
+
+arg_parser.add_argument('-p', '--processing_type',
+                            help='Generate files to send to the RU server or NGDAC server',
+                            choices=['ru', 'ngdac'],
+                            default='ru')
 
 arg_parser.add_argument('-m', '--mode',
                         help='Dataset mode: real-time (rt) or delayed-mode (delayed)',

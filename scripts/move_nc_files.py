@@ -2,7 +2,7 @@
 
 """
 Author: lgarzio on 12/7/2021
-Last modified: lgarzio on 10/17/2025
+Last modified: lgarzio on 10/19/2026
 Move quality controlled glider NetCDF files to the final data directory (out of qc_queue) to send to ERDDAP
 """
 
@@ -19,6 +19,7 @@ from rugliderqc.loggers import logfile_basename, setup_logger, logfile_deploymen
 def main(args):
 # def main(deployments, mode, loglevel, test):
     loglevel = args.loglevel.upper()
+    processing_type = args.processing_type
     mode = args.mode
     test = args.test
     loglevel = loglevel.upper()
@@ -36,7 +37,7 @@ def main(args):
         for deployment in args.deployments:
         # for deployment in [deployments]:  # for debugging
 
-            data_path, deployment_location = find_glider_deployment_datapath(logging_base, deployment, deployments_root, mode)
+            data_path, deployment_location = find_glider_deployment_datapath(logging_base, deployment, deployments_root, processing_type, mode)
 
             if not data_path:
                 logging_base.error(f'{deployment} data directory not found:')
@@ -46,7 +47,7 @@ def main(args):
                 logging_base.error(f'{deployment} deployment proc-logs directory not found:')
                 continue
 
-            logfilename = logfile_deploymentname(deployment, mode)
+            logfilename = logfile_deploymentname(deployment, processing_type, mode)
             logFile = os.path.join(deployment_location, 'proc-logs', logfilename)
             logging = setup_logger('logging', loglevel, logFile)
 
@@ -69,6 +70,7 @@ def main(args):
 
 if __name__ == '__main__':
     # deploy = 'ru39-20250423T1535'  #  ru44-20250306T0038 ru44-20250325T0438 ru39-20250423T1535
+    # processing_type = 'ngdac'  # ngdac or ru
     # mode = 'delayed'  # delayed rt
     # ll = 'debug'
     # test = True
@@ -79,6 +81,11 @@ if __name__ == '__main__':
     arg_parser.add_argument('deployments',
                             nargs='+',
                             help='Glider deployment name(s) formatted as glider-YYYYmmddTHHMM')
+
+    arg_parser.add_argument('-p', '--processing_type',
+                            help='Generate files to send to the RU server or NGDAC server',
+                            choices=['ru', 'ngdac'],
+                            default='ru')
 
     arg_parser.add_argument('-m', '--mode',
                             help='Dataset mode: real-time (rt) or delayed-mode (delayed)',

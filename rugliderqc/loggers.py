@@ -11,9 +11,9 @@ def logfile_basename():
     return f'/home/glideradm/logs/{user}-glider_qc.log'
 
 
-def logfile_deploymentname(deployment, mode):
+def logfile_deploymentname(deployment, processing_type, mode):
     user = pwd.getpwuid(os.getuid())[0]
-    logfilename = '-'.join([user, datetime.now().strftime('%Y%m%d') + '_' + deployment, mode, 'qc']) + '.log'
+    logfilename = '-'.join([user, datetime.now().strftime('%Y%m%d') + '_' + deployment, processing_type, mode, 'qc']) + '.log'
 
     return logfilename
 
