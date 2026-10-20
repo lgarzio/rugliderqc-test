@@ -2,7 +2,7 @@
 
 """
 Author: lnazzaro and lgarzio on 12/7/2021
-Last modified: lgarzio on 10/19/2026
+Last modified: lgarzio on 10/20/2026
 Flag CTD profile pairs that are severely lagged, which can be an indication of CTD pump issues.
 Each NetCDF file contains one glider segment and potentially multiple profile pairs.
 """
@@ -398,6 +398,7 @@ def main(args):
                             else:
                                 # Drop columns with 'latitude', 'longitude', or 'depth' in their column names
                                 df = df.drop(columns=[col for col in df.columns if 'latitude' in col or 'longitude' in col or 'depth' in col])
+                                df = df.drop(columns=[col for col in df.columns if 'lat' in col or 'lon' in col])
                                 polygon_points = df.values.tolist()
                                 polygon_points.append(polygon_points[0])
                                 polygon = Polygon(polygon_points)
