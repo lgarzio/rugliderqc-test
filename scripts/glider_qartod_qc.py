@@ -2,7 +2,7 @@
 
 """
 Author: lnazzaro and lgarzio on 12/7/2021
-Last modified: lgarzio on 10/19/2026
+Last modified: lgarzio on 10/20/2026
 Run ioos_qc QARTOD tests on processed glider NetCDF files and append the results to the original file.
 The glider NetCDF files contain one glider segment and potentially multiple profiles.
 """
@@ -33,8 +33,12 @@ def build_global_regional_config(ds, qc_config_root):
     """
     #profile_time = pd.to_datetime(ds.profile_time.values)
     time = cf.convert_epoch_ts(np.nanmedian(ds['time']))
-    lon = np.nanmedian(ds.longitude.values)
-    lat = np.nanmedian(ds.latitude.values)
+    try:
+        lon = np.nanmedian(ds.longitude.values)
+        lat = np.nanmedian(ds.latitude.values)
+    except AttributeError:
+        lon = np.nanmedian(ds.lon.values)
+        lat = np.nanmedian(ds.lat.values)
 
     # Set the path for the global and regional configuration files
     qc_config_root = os.path.join(qc_config_root, 'global_regional')
@@ -229,7 +233,10 @@ def main(args):
                 except ValueError:
                     # if depth rating isn't specified in the file, depth rating is the max glider depth rating (1050m)
                     depth_rating = float(1050)
-                pressure_rating = gsw.p_from_z(-depth_rating, np.nanmean(ds.latitude.values))
+                try:
+                    pressure_rating = gsw.p_from_z(-depth_rating, np.nanmean(ds.latitude.values))
+                except AttributeError:
+                    pressure_rating = gsw.p_from_z(-depth_rating, np.nanmean(ds.lat.values))
                 # cinfo = {'fail_span': [0, pressure_rating]}
                 cinfo = {'suspect_span': [0, pressure_rating], 'fail_span': [0, pressure_rating * 2]}
                 qc_varname = f'{sensor}_qartod_gross_range_test'
